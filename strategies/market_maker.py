@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Optional, Union, Any
 from concurrent.futures import ThreadPoolExecutor
+from statistics import NormalDist
 
 from api.bp_client import BPClient
 from api.websea_client import WebseaClient
@@ -17,6 +18,9 @@ from logger import setup_logger
 import traceback
 
 logger = setup_logger("market_maker")
+
+# 预建标准常态分布以复用 inv_cdf
+_STANDARD_NORMAL = NormalDist()
 
 def format_balance(value, decimals=8, threshold=1e-8) -> str:
     """
@@ -73,6 +77,9 @@ class MarketMaker:
         self.enable_rebalance = enable_rebalance
         self.base_asset_target_percentage = base_asset_target_percentage
         self.quote_asset_target_percentage = 100.0 - base_asset_target_percentage
+
+        # 价差梯度控制：使用常态分布型排列，调节两侧挂单密度
+        self.gaussian_spacing_scale = 0.85
 
         # 初始化数据库
         self.db = db_instance if db_instance else Database()
@@ -956,26 +963,35 @@ class MarketMaker:
             buy_prices: List[float] = []
             sell_prices: List[float] = []
 
-            spacing_factor = 1.0  # 越大代表越分散
-            steps = max(1, self.max_orders - 1)
+            half_spread = exact_spread / 2
 
-            for i in range(self.max_orders):
-                if i == 0:
-                    multiplier = 1.0
-                else:
-                    level_ratio = i / steps
-                    multiplier = 1.0 + spacing_factor * level_ratio
+            multipliers: List[float] = [1.0]
+            if self.max_orders > 1:
+                steps = self.max_orders - 1
+                denominator = steps + 1
+                scale = max(0.1, getattr(self, "gaussian_spacing_scale", 0.85))
 
-                buy_target = mid_price - (exact_spread / 2) * multiplier
-                sell_target = mid_price + (exact_spread / 2) * multiplier
+                for level in range(1, self.max_orders):
+                    quantile = level / denominator  # (0,1) 区间的均匀点
+                    tail_prob = 0.5 + (quantile / 2)
+                    # 限制在 (0.5, 1) 以避免无穷大
+                    tail_prob = min(max(tail_prob, 0.5001), 0.9999)
+                    z_value = _STANDARD_NORMAL.inv_cdf(tail_prob)
+                    multipliers.append(1.0 + scale * z_value)
+
+            for idx in range(self.max_orders):
+                multiplier = multipliers[idx]
+
+                buy_target = mid_price - half_spread * multiplier
+                sell_target = mid_price + half_spread * multiplier
 
                 buy_price = round_to_tick_size(buy_target, self.tick_size)
                 sell_price = round_to_tick_size(sell_target, self.tick_size)
 
-                if i > 0 and buy_price >= buy_prices[-1]:
+                if idx > 0 and buy_price >= buy_prices[-1]:
                     buy_price = round_to_tick_size(buy_prices[-1] - self.tick_size, self.tick_size)
 
-                if i > 0 and sell_price <= sell_prices[-1]:
+                if idx > 0 and sell_price <= sell_prices[-1]:
                     sell_price = round_to_tick_size(sell_prices[-1] + self.tick_size, self.tick_size)
 
                 buy_prices.append(buy_price)

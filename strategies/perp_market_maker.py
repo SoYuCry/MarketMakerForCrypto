@@ -651,11 +651,36 @@ class PerpetualMarketMaker(MarketMaker):
         deviation = net
         skew_ratio = max(-1.0, min(1.0, deviation / self.max_position))
 
-        if not current_price:
-            return buy_prices, sell_prices
+        # 以当前顶层价差作为偏移基准，避免放大至标的价格本身
+        top_spread = sell_prices[0] - buy_prices[0]
+        if top_spread <= 0:
+            # 回退至基础配置的半价差，确保仍可进行偏移
+            if current_price:
+                fallback_spread = current_price * (self.base_spread_percentage / 100)
+                top_spread = max(self.tick_size, fallback_spread)
+            else:
+                return buy_prices, sell_prices
 
-        # 如果是多头 (net > 0)，skew_offset为正；如果是空头 (net < 0)，skew_offset为负
-        skew_offset = current_price * self.inventory_skew * skew_ratio
+        half_spread = top_spread / 2
+        raw_offset = half_spread * self.inventory_skew * skew_ratio
+
+        if raw_offset == 0:
+            skew_offset = 0.0
+        else:
+            skew_offset = raw_offset
+            if self.tick_size > 0:
+                abs_offset = abs(raw_offset)
+                tick_steps = math.floor(abs_offset / self.tick_size)
+
+                # 当仓位接近阈值时确保至少跨出一档
+                if tick_steps == 0 and abs(skew_ratio) >= 0.8:
+                    tick_steps = 1
+
+                if tick_steps > 0:
+                    skew_offset = math.copysign(self.tick_size * tick_steps, raw_offset)
+
+            # 避免偏移超过半个价差导致反向交叉
+            skew_offset = math.copysign(min(abs(skew_offset), half_spread), skew_offset)
 
         # 调整价格以鼓励反向交易，使净仓位回归0
         # 如果是多头 (net > 0)，降低买卖价以鼓励市场吃掉我们的卖单，同时降低我们买入的意愿
@@ -672,7 +697,10 @@ class PerpetualMarketMaker(MarketMaker):
         # 输出价格调整详情
         logger.info("=== 价格计算 ===")
         logger.info(f"原始挂单: 买 {buy_prices[0]:.3f} | 卖 {sell_prices[0]:.3f}")
-        logger.info(f"偏移计算: 净持仓 {net:.3f} | 偏移系数 {self.inventory_skew:.2f} | 偏移量 {skew_offset:.4f}")
+        effective_skew = (skew_offset / half_spread) if half_spread else 0.0
+        logger.info(
+            f"偏移计算: 净持仓 {net:.3f} | 偏移系数 {self.inventory_skew:.2f} | 半价差 {half_spread:.4f} | 实际偏移 {skew_offset:.4f} ({effective_skew:.2%})"
+        )
         logger.info(f"调整后挂单: 买 {adjusted_buys[0]:.3f} | 卖 {adjusted_sells[0]:.3f}")
 
         # 风控：确保调整后买卖价没有交叉
