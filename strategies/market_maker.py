@@ -16,6 +16,7 @@ from database.db import Database
 from utils.helpers import round_to_precision, round_to_tick_size, calculate_volatility
 from logger import setup_logger
 import traceback
+import random
 
 logger = setup_logger("market_maker")
 
@@ -1767,7 +1768,7 @@ class MarketMaker:
                 logger.info(f"本次执行手续费: {session_fees:.8f} {self.quote_asset}")
                 logger.info(f"本次执行净利润: {session_net_pnl:.8f} {self.quote_asset}")
                 
-                wait_time = interval_seconds
+                wait_time = interval_seconds + random.uniform(-2, 2)  # 增加随机扰动，避免过于机械
                 logger.info(f"等待 {wait_time} 秒后进行下一次迭代...")
                 time.sleep(wait_time)
                 
