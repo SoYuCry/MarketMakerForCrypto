@@ -165,24 +165,15 @@ class BPClient(BaseExchangeClient):
         endpoint = f"/api/{API_VERSION}/order"
         instruction = "orderExecute"
         
-        # 提取所有参数用于签名
-        params = {
-            "orderType": order_details["orderType"],
-            "quantity": order_details["quantity"],
-            "side": order_details["side"],
-            "symbol": order_details["symbol"],
-            "timeInForce": order_details.get("timeInForce", "GTC")
-        }
-        
-        # 只有当订单包含价格时才添加 price 参数
-        if "price" in order_details:
-            params["price"] = order_details["price"]
-        
-        # 添加可选参数
-        for key in ["postOnly", "reduceOnly", "clientId", "quoteQuantity", 
-                    "autoBorrow", "autoLendRedeem", "autoBorrowRepay", "autoLend"]:
-            if key in order_details:
-                params[key] = str(order_details[key]).lower() if isinstance(order_details[key], bool) else str(order_details[key])
+        # 根據實際請求體產生簽名參數，確保完全一致
+        params = {}
+        for key, value in order_details.items():
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                params[key] = str(value).lower()
+            else:
+                params[key] = str(value)
 
         return self.make_request("POST", endpoint, self.api_key, self.secret_key, instruction, params, order_details)
 
