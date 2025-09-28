@@ -165,7 +165,7 @@ class BPClient(BaseExchangeClient):
         endpoint = f"/api/{API_VERSION}/order"
         instruction = "orderExecute"
         
-        # 根據實際請求體產生簽名參數，確保完全一致
+        # 提取所有参数用于签名
         params = {}
         for key, value in order_details.items():
             if value is None:

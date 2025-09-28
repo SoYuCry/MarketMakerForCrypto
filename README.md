@@ -31,63 +31,22 @@ Twitter：[YuCry|(❤,👾,💵)](https://x.com/0xYuCry)
 如果行情一直单边运行，敞口超过 0.5 SOL（max_postion 参数，可设置），会触发市价减仓，把超过的部分减掉。使得整体敞口维持中性（target_position 目标持仓，也可以设置维持多头/空头）。
 ![alt text](4ab077855373759f9706cc8814e39462.png)
 
-## 项目结构
+## (第 0 步：如果么有账号的话）
 
-```
-lemon_trader/
-│
-├── api/                  # API相关模块
-│   ├── __init__.py
-│   ├── auth.py           # API认证和签名相关
-│   ├── base_client.py    # 抽象基础客户端 (支持继承开发接入任意交易所)
-│   ├── bp_client.py      # Backpack Exchange 客户端
-│   ├── aster_client.py   # aster 交易所客户端
-│   └── websea_client.py  # websea 交易所客户端
-│
-├── websocket/            # WebSocket模块
-│   ├── __init__.py
-│   └── client.py         # WebSocket客户端
-│
-├── database/             # 数据库模块
-│   ├── __init__.py
-│   └── db.py             # 数据库操作
-│
-├── strategies/           # 策略模块
-│   ├── __init__.py
-│   ├── market_maker.py   # Backpack 永续做市策略
-│   └── perp_market_maker.py   # 永续合约做市策略
-│
-├── utils/                # 工具模块
-│   ├── __init__.py
-│   └── helpers.py        # 辅助函数
-│
-├── cli/                  # 命令行界面
-│   ├── __init__.py
-│   └── commands.py       # 命令行命令
-│
-├── panel/                # 交互式面板
-│   ├── __init__.py
-│   └── interactive_panel.py  # 交互式面板实现
-│
-├── config.py             # 配置文件
-├── logger.py             # 日志配置
-├── run.py                # 统一入口文件
-└── README.md             # 说明文档
-```
+Aster 自动全返链接：[fc51fF](https://www.asterdex.com/en/referral/fc51fF)
 
-## 环境要求
+Backpack 自动全返链接：[9gq7rl2r](https://backpack.exchange/join/9gq7rl2r)
 
-- Python 3.8 或更高版本
-- 所需第三方库：
-  - nacl (用于API签名)
-  - requests
-  - websocket-client
-  - numpy
-  - python-dotenv
+## 第一步：下载 viscode 和 anoconda 并安装
 
-## 安装
+Viscode：https://code.visualstudio.com/download
 
-1. 克隆或下载此代码库:
+Anoconda：https://www.anaconda.com/download/success
+
+
+## 第二步：下载代码并配置环境变量
+
+1. 克隆或下载此代码库（输入到 viscode 的黑窗中）:
 
 ```bash
 git clone https://github.com/SoYuCry/MarketMakerForCrypto.git
@@ -121,21 +80,26 @@ ASTER_API_KEY=your_aster_api_key
 ASTER_SECRET_KEY=your_aster_secret_key
 ```
 
-## 使用方法
+## 第三步：运行脚本
 
 #### BackPack 永续做市
 ```bash
-python run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --spread 0.05 \
+python run.py --exchange backpack --market-type perp --symbol SOL_USDC_PERP --spread 0.02 \
   --quantity 0.1 --max-orders 2 --target-position 0 --max-position 0.5 \
   --position-threshold 0.4 --inventory-skew 0 --duration 999999999 --interval 10
 ```
 
 #### Aster 永续做市
 ```bash
-python run.py --exchange aster --market-type perp --symbol SOLUSDT --spread 0.05 \
+python run.py --exchange aster --market-type perp --symbol SOLUSDT --spread 0.02 \
   --quantity 0.1 --max-orders 2 --target-position 0 --max-position 0.5 \
   --position-threshold 0.4 --inventory-skew 0 --duration 999999999 --interval 10
 ```
+
+## 第四步：查看网页前端是否运行正常。
+👉 正常表现：频繁挂单与撤单，偶尔成交。
+
+⚠️ **遇到任何问题！先问 AI；搞不定再末尾扫码进群丢截图！！**
 
 ### 命令行参数
 
@@ -152,21 +116,10 @@ python run.py --exchange aster --market-type perp --symbol SOLUSDT --spread 0.05
 - `--max-position`：永续合约最大允许净仓
 - `--position-threshold`：永续仓位调整触发值
 - `--inventory-skew`：永续做市报价偏移系数（暂时为 0，功能等待更新）
-
-
-
-#### 永续合约参数详解
-
-- `target_position`：**目标持仓量**（绝对值）。设置您希望维持的库存大小，策略会在持仓**超过**此目标时进行减仓，而非主动开仓达到目标。
-- `max_position`：**最大持仓量**。仓位的硬性上限，超出后会立即强制平仓，是最高优先级的风控机制。
-- `position_threshold`：**仓位调整阈值**。当 `当前持仓 > target_position + threshold` 时触发减仓操作。
-- `inventory_skew`：**风险中性系数** (0-1)。根据净仓位自动调整报价：
   - 持有多单时：报价下移，吸引卖单成交
   - 持有空单时：报价上移，吸引买单成交
   - 目标：持续将净仓位推向 `0`，降低方向性风险
 
-
-### 永续合约做市
 
 
 #### 仓位管理逻辑优化
@@ -200,8 +153,10 @@ python run.py --exchange aster --market-type perp --symbol SOLUSDT --spread 0.05
 ## 注意事项
 
 ### 一般注意事项
-- 交易涉及风险，请谨慎使用
-- 建议先在小资金上测试策略效果
-- 定期检查交易统计以评估策略表现
+⚠️ 交易有风险，请谨慎使用
 
-![alt text](fbd88aef3c0f049e8d3b57238e7565eb.jpg)
+✅ 建议先用小资金测试策略效果
+
+📊 定期检查日志与统计，评估策略表现
+
+<img src="fbd88aef3c0f049e8d3b57238e7565eb.jpg" alt="说明文字" width="300">
